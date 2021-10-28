@@ -13,15 +13,29 @@ from PIL import Image
 import torch
 import torch.nn as nn
 
-from src.cube.ai_backend.pytorch.dataset import CubeDataset
-from src.cube.ai_backend.pytorch.model import build_models
-from src.cube.ai_backend.pytorch.train_loop import Trainer
-from src.cube.ai_backend.pytorch.utils import Monitor, Terminator, get_train_transforms, get_val_transforms, \
+from pytorch.dataset import CubeDataset
+from pytorch.model import build_models
+from pytorch.train_loop import Trainer
+from pytorch.utils import Monitor, Terminator, get_train_transforms, get_val_transforms, \
     set_global_seeds, EvaluationMonitor
 
 LOGGER = logging.getLogger(__name__)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+def take_filename(str):
+    return str.split('\\')[-1]
+
+def prepare_df_from_json(path_to_datajson, needed_classes):
+    df = pd.read_json(path_to_datajson)
+    subdf = df[["image_urls", "class_type", "class_name"]]
+    training_subset = subdf[(subdf["class_name"] == needed_classes[0]) | (subdf["class_name"] == needed_classes[1]) | (
+                subdf["class_name"] == needed_classes[2]) | (subdf["class_name"] == needed_classes[3])]
+    data = []
+    for urls, label, subclass in training_subset[["image_urls", "class_type", "class_name"]].values:
+        for i in range(4):
+            data.append([take_filename(urls[i]), label, subclass])
+    return pd.DataFrame(data, columns=["file", "label", "subclass"])
 
 
 class ClassifierModel:
@@ -471,6 +485,45 @@ class ClassifierModel:
         """
         train_df = self._prepare_df(train_df)
         train_y = train_df["label"]
+        cws = class_weight.compute_class_weight("balanced", np.unique(train_y), train_y)
+        LOGGER.info(f"Class weights for labels: {cws}")
+
+        LOGGER.info("Loading data")
+        train_loader, val_loader = self._prepare_training_generators(
+            train_df, self.train_path
+        )
+        train_loader_length = len(train_loader)
+        # Create training and validation dataloaders
+        dataloaders_dict = {"train": train_loader, "val": val_loader}
+        try:
+            # train a pretrained model
+            if self.feature_extract:
+                LOGGER.info("Start training pretrained models")
+                _ = self.train_pretrain(cws, train_loader_length, dataloaders_dict, monitor, terminator, False)
+            # finetune a pretrained model
+            if self.finetune_layer != -1:
+                LOGGER.info("Start finetuning pretrained model")
+                _ = self.train_finetune(cws, train_loader_length, dataloaders_dict, monitor, terminator)
+        except KeyboardInterrupt:
+            LOGGER.info("Training interrupted")
+            self.net = self._init_model()
+
+    def train_from_csv(self, path, costume_classes, monitor: Monitor, terminator: Terminator):
+        """
+        Training
+        First perform a training of pretrained model.
+        If arguments of finetuning are passed, perform a finetuning using weights of above pretrained model.
+
+        Args:
+            train_df (pd.DataFrame) : Dataframe containing image file names, labels and sublabel
+            monitor (Monitor) : monitor the current batch and epoch of the training loop
+            terminator (Terminator) : check if there is any termination request
+        """
+        # train_df = self._prepare_df(train_df)
+
+        train_df = prepare_df_from_json(path_to_datajson=path, needed_classes=costume_classes)
+        train_y = train_df["label"]
+
         cws = class_weight.compute_class_weight("balanced", np.unique(train_y), train_y)
         LOGGER.info(f"Class weights for labels: {cws}")
 

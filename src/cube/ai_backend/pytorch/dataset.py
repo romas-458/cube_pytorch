@@ -19,7 +19,7 @@ class CubeDataset(Dataset):
             is_pil_image (bool) : whether list passed to x contains pil images or list of image paths
         """
         self.img_filepath = x
-        self.lbls = y
+        self.lbls = [0 if el == 'OK' else 1 for el in y]
         self.root_dir = root_dir
         self.transform = transform
         self.is_pil_image = is_pil_image

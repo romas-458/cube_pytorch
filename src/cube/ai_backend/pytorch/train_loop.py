@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 
 import torch
-from src.cube.ai_backend.pytorch.utils import Monitor, Terminator
+from pytorch.utils import Monitor, Terminator
 
 LOGGER = logging.getLogger(__name__)
 
@@ -75,6 +75,12 @@ class Trainer:
         stream = tqdm(self.train_data, position=0, leave=True)
         # Iterate over batch of data.
         for _, (inputs, labels) in enumerate(stream):
+            print(type(inputs))
+            print(type(labels))
+            print(labels)
+            labels = torch.from_numpy(np.array(labels))
+            # inputs = torch.from_numpy(np.asarray(inputs))
+            # labels = torch.as_tensor(labels)
             inputs = inputs.to(self.device, non_blocking=True)
             labels = labels.to(self.device, non_blocking=True)
             # zero the parameter gradients

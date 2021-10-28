@@ -1,6 +1,6 @@
 import cv2
 import albumentations as A
-from albumentations.pytorch.transforms import ToTensor
+from albumentations.pytorch.transforms import ToTensor, ToTensorV2
 import numpy as np
 import random
 import torch
@@ -89,7 +89,7 @@ def get_train_transforms(height, width, means, stds):
                 p=0.5,
             ),
             A.Normalize(mean=means, std=stds, p=1),
-            ToTensor(),
+            ToTensorV2(),
         ], p=1
     )
     return trn_transform
@@ -103,7 +103,7 @@ def get_val_transforms(height, width, means, stds):
         [
             A.Resize(height, width, cv2.INTER_NEAREST, p=1),
             A.Normalize(mean=means, std=stds, p=1),
-            ToTensor(),
+            ToTensorV2(),
         ], p=1
     )
     return val_transform
