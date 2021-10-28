@@ -1,5 +1,5 @@
-from pytorch.single_img_pytorch_model import ClassifierModel
-from pytorch.utils import Monitor, Terminator
+from cube_pytorch.pytorch.single_img_pytorch_model import ClassifierModel
+from cube_pytorch.pytorch.utils import Monitor, Terminator
 import os
 import pandas as pd
 

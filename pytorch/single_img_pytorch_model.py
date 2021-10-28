@@ -13,10 +13,10 @@ from PIL import Image
 import torch
 import torch.nn as nn
 
-from pytorch.dataset import CubeDataset
-from pytorch.model import build_models
-from pytorch.train_loop import Trainer
-from pytorch.utils import Monitor, Terminator, get_train_transforms, get_val_transforms, \
+from cube_pytorch.pytorch.dataset import CubeDataset
+from cube_pytorch.pytorch.model import build_models
+from cube_pytorch.pytorch.train_loop import Trainer
+from cube_pytorch.pytorch.utils import Monitor, Terminator, get_train_transforms, get_val_transforms, \
     set_global_seeds, EvaluationMonitor
 
 LOGGER = logging.getLogger(__name__)

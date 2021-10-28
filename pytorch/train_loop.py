@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 
 import torch
-from pytorch.utils import Monitor, Terminator
+from cube_pytorch.pytorch.utils import Monitor, Terminator
 
 LOGGER = logging.getLogger(__name__)
 
