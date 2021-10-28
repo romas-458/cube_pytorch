@@ -75,9 +75,6 @@ class Trainer:
         stream = tqdm(self.train_data, position=0, leave=True)
         # Iterate over batch of data.
         for _, (inputs, labels) in enumerate(stream):
-            print(type(inputs))
-            print(type(labels))
-            print(labels)
             labels = torch.from_numpy(np.array(labels))
             # inputs = torch.from_numpy(np.asarray(inputs))
             # labels = torch.as_tensor(labels)
