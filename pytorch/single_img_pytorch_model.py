@@ -386,6 +386,14 @@ class ClassifierModel:
                     epoch_recall
                 )
             )
+            print("\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
+                    'valid',
+                    epoch_loss,
+                    epoch_acc,
+                    epoch_f1,
+                    epoch_precision,
+                    epoch_recall
+                ))
         time_elapsed = time.time() - since
         LOGGER.info(
             "Training complete in {:.0f}m {:.0f}s".format(
