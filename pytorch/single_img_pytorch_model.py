@@ -350,7 +350,7 @@ class ClassifierModel:
         # one cycle scheduler
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
-            max_lr=self.lr * 100,
+            max_lr=self.lr * 0.1,
             steps_per_epoch=train_loader_length,
             epochs=self.epochs
         )
@@ -386,14 +386,7 @@ class ClassifierModel:
                     epoch_recall
                 )
             )
-            print("\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
-                    'valid',
-                    epoch_loss,
-                    epoch_acc,
-                    epoch_f1,
-                    epoch_precision,
-                    epoch_recall
-                ))
+
         time_elapsed = time.time() - since
         LOGGER.info(
             "Training complete in {:.0f}m {:.0f}s".format(
@@ -431,7 +424,7 @@ class ClassifierModel:
         # one cycle scheduler
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
-            max_lr=self.lr * 10,
+            max_lr=self.lr * 0.1,
             steps_per_epoch=train_loader_length,
             epochs=self.epochs
         )
