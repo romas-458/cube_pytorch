@@ -267,7 +267,7 @@ class ClassifierModel:
         mean_pred = np.mean(prob.cpu().numpy(), axis=0)
         return mean_pred[1]
 
-    def evaluate(self, eval_df: pd.DataFrame, local_storage_dir: str, eval_monitor: EvaluationMonitor,
+    def evaluate(self, eval_df: pd.DataFrame,  local_storage_dir: str, eval_monitor: EvaluationMonitor,
                  eval_terminator: Terminator) -> List:
         """
         Evaluation
@@ -288,6 +288,68 @@ class ClassifierModel:
             x=list(eval_df["file"]),
             y=None,
             root_dir=local_storage_dir,
+            transform=val_transforms
+        )
+        # NOTE: batch size should be a multiple of self.parallel_networks
+        eval_loader = torch.utils.data.DataLoader(
+            eval_batch,
+            batch_size=self.batch_size,
+            pin_memory=True,
+            num_workers=self.num_workers,
+            shuffle=False
+        )
+        eval_monitor.total_images = len(eval_loader) * self.batch_size
+        all_preds = []
+        preds = []
+        self.net.eval()
+        try:
+            with torch.no_grad():
+                for _, (data) in tqdm(
+                        enumerate(eval_loader), total=len(eval_loader), position=0
+                ):
+                    data = data.to(device, non_blocking=True)
+                    output = self.net(data)
+                    prob = torch.sigmoid(output).cpu().numpy()
+                    # aggregate the predictions in groups of self.parallel_networks
+                    for i in range(0, len(prob), self.parallel_networks):
+                        all_preds.append(
+                            list(np.mean(prob[i: i + self.parallel_networks], axis=0))
+                        )
+                    eval_monitor.evaluated_images += self.batch_size
+                    if eval_terminator.terminate_flag:
+                        eval_terminator.reset()
+                        raise KeyboardInterrupt
+            # instead of storing max prediction store column 1 prediction and use it for thresholding
+            for x in all_preds:
+                preds.append(x[1])
+        except KeyboardInterrupt:
+            LOGGER.info("Evaluation interrupted")
+        return preds
+
+    def evaluate_from_csv(self, path, costume_classes, eval_monitor: EvaluationMonitor,
+                 eval_terminator: Terminator) -> List:
+        """
+        Evaluation
+
+        Args:
+            eval_df (pd.DataFrame): Dataframe containing image file names
+            local_storage_dir (str): Path to eval images
+            eval_monitor (EvaluationMonitor): Monitor the progress of evaluating dataset
+            eval_terminator (Terminator) : Check if there is a termination signal
+        Returns:
+            preds (List): List of aggregated predictions
+        """
+
+        eval_df = prepare_df_from_json(path_to_datajson=path, needed_classes=costume_classes)
+
+        # eval_df = self._prepare_df(eval_df)
+        val_transforms = get_val_transforms(
+            self.height, self.width, self.means, self.stds
+        )
+        eval_batch = CubeDataset(
+            x=list(eval_df["file"]),
+            y=None,
+            root_dir=self.train_path,
             transform=val_transforms
         )
         # NOTE: batch size should be a multiple of self.parallel_networks
