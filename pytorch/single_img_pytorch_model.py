@@ -19,7 +19,8 @@ from cube_pytorch.pytorch.train_loop import Trainer
 from cube_pytorch.pytorch.utils import Monitor, Terminator, get_train_transforms, get_val_transforms, \
     set_global_seeds, EvaluationMonitor
 
-LOGGER = logging.getLogger(__name__)
+# LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
