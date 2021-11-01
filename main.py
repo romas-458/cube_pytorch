@@ -2,6 +2,10 @@ from cube_pytorch.pytorch.single_img_pytorch_model import ClassifierModel
 from cube_pytorch.pytorch.utils import Monitor, Terminator
 import os
 import pandas as pd
+import logging
+
+logging.basicConfig()
+LOGGER = logging.getLogger(__name__)
 
 # path_to_datajson = '/home/roman/Завантаження/Cube_project/Data 13.09.2021-20210921T124220Z-001/Data 13.09.2021/trainingData.json'
 # okt_class = 'OK Top New'
@@ -12,6 +16,7 @@ import pandas as pd
 # examples = [okb_class, okt_class, nokb_class, nokt_class]
 
 def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs):
+    LOGGER.info("Initializing components")
     ROOT_DIR = root_dir #"/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     model_path = ROOT_DIR + "models_out"
     ai_default_model_path = os.path.join(ROOT_DIR, "models/cube_resnext101.pth")  # path to save model
