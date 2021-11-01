@@ -8,8 +8,9 @@ from tqdm import tqdm
 import torch
 from cube_pytorch.pytorch.utils import Monitor, Terminator
 
-# LOGGER = logging.getLogger(__name__)
-LOGGER = logging.getLogger('app')
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.INFO)
+# LOGGER = logging.getLogger('app')
 
 # cool tricks: https://efficientdl.com/faster-deep-learning-in-pytorch-a-guide/
 class Trainer:
