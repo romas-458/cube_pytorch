@@ -426,7 +426,7 @@ class ClassifierModel:
         # one cycle scheduler
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
-            max_lr=self.lr * 0.1,
+            max_lr=self.lr * 100,
             steps_per_epoch=train_loader_length,
             epochs=self.epochs
         )
@@ -500,7 +500,7 @@ class ClassifierModel:
         # one cycle scheduler
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
-            max_lr=self.lr * 0.1,
+            max_lr=self.lr * 10,
             steps_per_epoch=train_loader_length,
             epochs=self.epochs
         )
