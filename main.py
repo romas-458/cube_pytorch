@@ -1,5 +1,7 @@
 from cube_pytorch.pytorch.single_img_pytorch_model import ClassifierModel
 from cube_pytorch.pytorch.utils import Monitor, Terminator
+
+from sklearn import metrics
 import os
 import pandas as pd
 import logging
@@ -37,3 +39,26 @@ def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs):
     terminator = Terminator()
     monitor = Monitor()
     pytorch_model.train_from_csv(path_to_datajson, examples, monitor, terminator)
+
+def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model):
+    ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
+    ai_default_model_path = os.path.join(ROOT_DIR, path_to_model)  # path to save model
+    model_path = ROOT_DIR + "models_out"
+    ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
+    ai_nok_threshold = 0.5
+    pytorch_model = ClassifierModel(
+        save_model_path=model_path,
+        base_model_path=os.path.join(ROOT_DIR, path_to_model),
+        train_path=os.path.join(ROOT_DIR, local_storage_dir),
+        nok_threshold=ai_nok_threshold,
+        epochs=epochs,
+    )
+    terminator = Terminator()
+    monitor = Monitor()
+    eval_df, preds = pytorch_model.evaluate_from_csv(path_to_datajson, examples, monitor, terminator)
+
+    predictions = [0 if x < pytorch_model.nok_threshold else 1 for x in preds]
+    assert len(predictions) == len(eval_df)
+    # NOTE works only for binary case
+    tn, fp, fn, tp = metrics.confusion_matrix(eval_df["label"].values, predictions).ravel()
+    print('tp= ' + str(tp) + 'fp= ' + str(fp) + 'fn= '+ str(fn) + 'tp= '+ str(tp) )

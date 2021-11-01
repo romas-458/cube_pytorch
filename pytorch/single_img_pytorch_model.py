@@ -386,7 +386,7 @@ class ClassifierModel:
                 preds.append(x[1])
         except KeyboardInterrupt:
             LOGGER.info("Evaluation interrupted")
-        return preds
+        return eval_df, preds
 
     def train_pretrain(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
                        terminator: Terminator, is_kfold: bool = False, f: int = -1, base_model_path: str = "",
