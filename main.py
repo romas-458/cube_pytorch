@@ -5,7 +5,9 @@ import pandas as pd
 import logging
 
 logging.basicConfig()
+
 LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.INFO)
 
 # path_to_datajson = '/home/roman/Завантаження/Cube_project/Data 13.09.2021-20210921T124220Z-001/Data 13.09.2021/trainingData.json'
 # okt_class = 'OK Top New'
