@@ -69,6 +69,7 @@ def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
     eval_df, preds = pytorch_model.evaluate_from_csv(path_to_datajson, examples, monitor, terminator)
 
     predictions = [0 if x < pytorch_model.nok_threshold else 1 for x in preds]
+    LOGGER.info("predictions len = " + str(len(predictions)) + 'eval len = ' + str(len(eval_df)))
     assert len(predictions) == len(eval_df)
     # NOTE works only for binary case
     tn, fp, fn, tp = metrics.confusion_matrix(eval_df["label"].values, predictions).ravel()
