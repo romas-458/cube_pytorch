@@ -48,7 +48,8 @@ def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
     ai_nok_threshold = 0.5
     pytorch_model = ClassifierModel(
         save_model_path=model_path,
-        base_model_path=os.path.join(ROOT_DIR, path_to_model),
+        # base_model_path=os.path.join(ROOT_DIR, path_to_model),
+        base_model_path=ai_default_model_path,
         train_path=os.path.join(ROOT_DIR, local_storage_dir),
         nok_threshold=ai_nok_threshold,
         epochs=epochs,
