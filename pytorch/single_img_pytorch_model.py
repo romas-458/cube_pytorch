@@ -36,7 +36,13 @@ def prepare_df_from_json(path_to_datajson, needed_classes):
     data = []
     for urls, label, subclass in training_subset[["image_urls", "class_type", "class_name"]].values:
         for i in range(4):
-            data.append([take_filename(urls[i]), label, subclass])
+            if label == 'OK':
+                label01 = 0
+            else:
+                label01 = 1
+            # data.append([take_filename(urls[i]), label, subclass])
+            data.append([take_filename(urls[i]), label01, subclass])
+
     return pd.DataFrame(data, columns=["file", "label", "subclass"])
 
 
@@ -375,10 +381,14 @@ class ClassifierModel:
                     output = self.net(data)
                     prob = torch.sigmoid(output).cpu().numpy()
                     # aggregate the predictions in groups of self.parallel_networks
-                    for i in range(0, len(prob), self.parallel_networks):
-                        all_preds.append(
-                            list(np.mean(prob[i: i + self.parallel_networks], axis=0))
-                        )
+                    # for i in range(0, len(prob), self.parallel_networks):
+                    #     all_preds.append(
+                    #         list(np.mean(prob[i: i + self.parallel_networks], axis=0))
+                    #     )
+
+                    prob = prob.tolist()
+                    all_preds.extend(prob)
+
                     eval_monitor.evaluated_images += self.batch_size
                     if eval_terminator.terminate_flag:
                         eval_terminator.reset()
