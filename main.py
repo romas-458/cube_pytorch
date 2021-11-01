@@ -1,5 +1,5 @@
 from cube_pytorch.pytorch.single_img_pytorch_model import ClassifierModel
-from cube_pytorch.pytorch.utils import Monitor, Terminator
+from cube_pytorch.pytorch.utils import Monitor, Terminator, EvaluationMonitor
 
 from sklearn import metrics
 import os
@@ -65,7 +65,7 @@ def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
     #     epochs=epochs,
     # )
     terminator = Terminator()
-    monitor = Monitor()
+    monitor = EvaluationMonitor()
     eval_df, preds = pytorch_model.evaluate_from_csv(path_to_datajson, examples, monitor, terminator)
 
     predictions = [0 if x < pytorch_model.nok_threshold else 1 for x in preds]
