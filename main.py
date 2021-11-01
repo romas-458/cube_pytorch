@@ -45,7 +45,7 @@ def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
     ai_default_model_path = os.path.join(ROOT_DIR, path_to_model)  # path to save model
     model_path = os.path.join(ROOT_DIR, path_to_model)
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
-    ai_nok_threshold = 0.5
+    ai_nok_threshold = 0.3
 
 
     pytorch_model = ClassifierModel(
