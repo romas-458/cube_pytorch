@@ -43,7 +43,7 @@ def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs):
 def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model):
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     ai_default_model_path = os.path.join(ROOT_DIR, path_to_model)  # path to save model
-    model_path = os.path.join(ROOT_DIR, 'models_out')
+    model_path = os.path.join(ROOT_DIR, path_to_model)
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
     ai_nok_threshold = 0.5
 
