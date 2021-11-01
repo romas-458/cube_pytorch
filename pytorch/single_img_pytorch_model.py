@@ -341,7 +341,9 @@ class ClassifierModel:
         """
 
         eval_df = prepare_df_from_json(path_to_datajson=path, needed_classes=costume_classes)
-
+        LOGGER.info("size of DF" + str(len(eval_df)))
+        LOGGER.info("DF head")
+        LOGGER.info(eval_df.head())
         # eval_df = self._prepare_df(eval_df)
         val_transforms = get_val_transforms(
             self.height, self.width, self.means, self.stds
@@ -587,6 +589,7 @@ class ClassifierModel:
         # train_df = self._prepare_df(train_df)
 
         train_df = prepare_df_from_json(path_to_datajson=path, needed_classes=costume_classes)
+
         train_y = train_df["label"]
 
         cws = class_weight.compute_class_weight("balanced", np.unique(train_y), train_y)
