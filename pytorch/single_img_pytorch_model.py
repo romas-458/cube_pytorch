@@ -522,12 +522,12 @@ class ClassifierModel:
         )
         trainer = Trainer(model=self.net, dataloaders=dataloaders_dict, num_classes=self.num_classes,
                           input_channels=self.input_channels, criterion=criterion, optimizer=optimizer,
-                          scheduler=scheduler, num_epochs=self.epochs, device=device, monitor=monitor,
+                          scheduler=scheduler, num_epochs=self.finetune_epochs, device=device, monitor=monitor,
                           terminator=terminator, finetune=True, folds=folds, parallel_networks=self.parallel_networks,
                           nok_threshold=self.nok_threshold)
         since = time.time()
-        for epoch in range(1, self.epochs+1):
-            LOGGER.info(f"\n{'--'*5} EPOCH: {epoch} | {self.epochs} {'--'*5}\n")
+        for epoch in range(1, self.finetune_epochs+1):
+            LOGGER.info(f"\n{'--'*5} EPOCH: {epoch} | {self.finetune_epochs} {'--'*5}\n")
             epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.train_one_epoch()
             LOGGER.info(
                 "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
