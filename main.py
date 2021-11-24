@@ -22,7 +22,7 @@ LOGGER.setLevel(logging.INFO)
 def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height):
     LOGGER.info("Initializing components")
     ROOT_DIR = root_dir #"/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
-    model_path = ROOT_DIR + "models_out"
+    model_path = os.path.join(ROOT_DIR, "model.pth")
     ai_default_model_path = os.path.join(ROOT_DIR, "models/cube_resnext101.pth")  # path to save model
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
     ai_nok_threshold = 0.5
@@ -46,7 +46,7 @@ def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width,
 def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, config):
     LOGGER.info("Initializing components")
     ROOT_DIR = root_dir #"/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
-    model_path = ROOT_DIR + "models_out"
+    model_path = os.path.join(ROOT_DIR, "model.pth")
     ai_default_model_path = os.path.join(ROOT_DIR, "models/cube_resnext101.pth")  # path to save model
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
     ai_nok_threshold = 0.5
