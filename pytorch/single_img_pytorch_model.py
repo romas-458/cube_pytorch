@@ -618,7 +618,15 @@ class ClassifierModel:
 
         train_y = train_df["label"]
 
-        cws = class_weight.compute_class_weight("balanced", np.unique(train_y), train_y)
+        # cws = class_weight.compute_class_weight("balanced", np.unique(train_y), train_y)
+
+        cws = class_weight.compute_class_weight(
+            class_weight="balanced",
+            classes=np.unique(train_y),
+            y=train_y
+        )
+        cws = dict(zip(np.unique(train_y), cws))
+
         LOGGER.info(f"Class weights for labels: {cws}")
 
         LOGGER.info("Loading data")
