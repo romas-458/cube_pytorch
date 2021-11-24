@@ -36,6 +36,7 @@ def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width,
         epochs = epochs,
         width = width,
         height = height,
+        finetune_epochs = epochs
     )
 
     terminator = Terminator()
