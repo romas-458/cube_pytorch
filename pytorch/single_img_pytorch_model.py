@@ -625,7 +625,7 @@ class ClassifierModel:
             classes=np.unique(train_y),
             y=train_y
         )
-        cws = dict(zip(np.unique(train_y), cws))
+        # cws = dict(zip(np.unique(train_y), cws))
 
         LOGGER.info(f"Class weights for labels: {cws}")
 
