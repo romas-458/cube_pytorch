@@ -42,6 +42,35 @@ def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width,
     monitor = Monitor()
     pytorch_model.train_from_csv(path_to_datajson, examples, monitor, terminator)
 
+def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, config):
+    LOGGER.info("Initializing components")
+    ROOT_DIR = root_dir #"/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
+    model_path = ROOT_DIR + "models_out"
+    ai_default_model_path = os.path.join(ROOT_DIR, "models/cube_resnext101.pth")  # path to save model
+    ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
+    ai_nok_threshold = 0.5
+    local_storage_dir = local_storage_dir # "/home/roman/Завантаження/Cube_project/Data 13.09.2021-20210921T124220Z-001/Data 13.09.2021/blob_storage"
+
+    pytorch_model = ClassifierModel(
+        save_model_path=model_path,
+        base_model_path=os.path.join(ROOT_DIR, ai_default_base_path),
+        train_path=os.path.join(ROOT_DIR, local_storage_dir),
+        nok_threshold=ai_nok_threshold,
+        epochs = epochs,
+        width = width,
+        height = height,
+        #wandb
+        finetune_layer = config.finetune_layer,
+        finetune_lr_multiplier = config.finetune_lr_multiplier,
+        finetune_max_lr_multiplier = config.finetune_max_lr_multiplier,
+        finetune_epochs = config.finetune_epochs,
+        finetune_embed_dim = config.finetune_embed_dim,
+    )
+
+    terminator = Terminator()
+    monitor = Monitor()
+    pytorch_model.train_from_csv(path_to_datajson, examples, monitor, terminator)
+
 def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model):
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     ai_default_model_path = os.path.join(ROOT_DIR, path_to_model)  # path to save model

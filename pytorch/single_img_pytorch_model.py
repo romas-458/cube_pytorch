@@ -72,7 +72,13 @@ class ClassifierModel:
             use_pretrain: bool = False,  # don't download imagenet weights
             finetune_layer: int = 270,
             nok_threshold: float = 0.5,
-            images_per_sample: int = 4
+            images_per_sample: int = 4,
+            #wandb
+            finetune_lr_multiplier: float = 0.1,
+            finetune_max_lr_multiplier: int = 10,
+            finetune_epochs: int = 20,
+            finetune_embed_dim: int = 256,
+
     ):
         set_global_seeds()
         # hyperparameters BEGIN
@@ -97,11 +103,19 @@ class ClassifierModel:
         self.model_name = model_name
         self.feature_extract = feature_extract
         self.use_pretrain = use_pretrain
-        self.finetune_layer = finetune_layer
         self.nok_threshold = nok_threshold
         # hyperparameters END
         self.parallel_networks = images_per_sample
         self.net = self._init_model()
+
+        ##wandb
+        #previous
+        self.finetune_layer = finetune_layer
+        #new
+        self.finetune_embed_size = finetune_embed_dim
+        self.finetune_lr_multiplier = finetune_lr_multiplier
+        self.finetune_max_lr_multiplier = finetune_max_lr_multiplier
+        self.finetune_epochs = finetune_epochs
 
     def _init_model(self):
         LOGGER.info("Initializing model from given weights")
@@ -144,7 +158,8 @@ class ClassifierModel:
             model_name=self.model_name,
             num_classes=self.num_classes,
             in_channels=self.input_channels,
-            embedding_size=self.embed_size,
+            # embedding_size=self.embed_size,
+            embedding_size = self.finetune_embed_size,
             feature_extract=self.feature_extract,
             use_pretrained=self.use_pretrain,
             base_model_path=self.base_model_path,
@@ -496,13 +511,14 @@ class ClassifierModel:
         self.net = self._build_finetune_model()
         t_parameters = [p for p in self.net.parameters() if p.requires_grad]
         criterion = nn.BCEWithLogitsLoss(weight=torch.from_numpy(cws)).to(device)
-        optimizer = torch.optim.AdamW(t_parameters, lr=self.lr * 0.1, amsgrad=True)
+        optimizer = torch.optim.AdamW(t_parameters, lr=self.lr * self.finetune_lr_multiplier, amsgrad=True)
         # one cycle scheduler
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
-            max_lr=self.lr * 10,
+            max_lr=self.lr * self.finetune_max_lr_multiplier,
             steps_per_epoch=train_loader_length,
-            epochs=self.epochs
+            # epochs=self.epochs
+            epochs = self.finetune_epochs
         )
         trainer = Trainer(model=self.net, dataloaders=dataloaders_dict, num_classes=self.num_classes,
                           input_channels=self.input_channels, criterion=criterion, optimizer=optimizer,
