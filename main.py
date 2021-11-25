@@ -20,7 +20,7 @@ LOGGER.setLevel(logging.INFO)
 
 # examples = [okb_class, okt_class, nokb_class, nokt_class]
 
-def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height):
+def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, ft_layers = 270):
     LOGGER.info("Initializing components")
     ROOT_DIR = root_dir #"/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     model_path = os.path.join(ROOT_DIR, "model.pth")
@@ -37,18 +37,19 @@ def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width,
         epochs = epochs,
         width = width,
         height = height,
-        finetune_epochs = epochs
+        finetune_epochs = epochs,
+        finetune_layer = ft_layers,
     )
 
     terminator = Terminator()
     monitor = Monitor()
     pytorch_model.train_from_csv(path_to_datajson, examples, monitor, terminator)
 
-def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, config):
+def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, config, default_model_path = "models/cube_resnext101.pth"):
     LOGGER.info("Initializing components")
     ROOT_DIR = root_dir #"/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     model_path = os.path.join(ROOT_DIR, "model.pth")
-    ai_default_model_path = os.path.join(ROOT_DIR, "models/cube_resnext101.pth")  # path to save model
+    ai_default_model_path = os.path.join(ROOT_DIR, default_model_path)  # path to save model
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
     ai_nok_threshold = 0.5
     local_storage_dir = local_storage_dir # "/home/roman/Завантаження/Cube_project/Data 13.09.2021-20210921T124220Z-001/Data 13.09.2021/blob_storage"
