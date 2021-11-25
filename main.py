@@ -61,6 +61,8 @@ def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
         epochs = epochs,
         width = width,
         height = height,
+        #
+        feature_extract = False,
         #wandb
         finetune_layer = config.finetune_layer,
         finetune_lr_multiplier = config.finetune_lr_multiplier,
