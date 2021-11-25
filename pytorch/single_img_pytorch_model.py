@@ -480,6 +480,8 @@ class ClassifierModel:
                 )
             )
 
+            wandb.log({'epoch_train': epoch, 'train_acc': epoch_acc, 'train_loss': epoch_loss})
+
         time_elapsed = time.time() - since
         LOGGER.info(
             "Training complete in {:.0f}m {:.0f}s".format(
