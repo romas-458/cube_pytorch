@@ -468,6 +468,8 @@ class ClassifierModel:
                     epoch_recall
                 )
             )
+
+            wandb.log({'train_acc': epoch_acc, 'train_loss': epoch_loss})
             epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.valid_one_epoch()
             LOGGER.info(
                 "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
@@ -480,7 +482,7 @@ class ClassifierModel:
                 )
             )
 
-            wandb.log({'epoch_train': epoch, 'train_acc': epoch_acc, 'train_loss': epoch_loss})
+            wandb.log({'train_epoch': epoch, 'train_val_acc': epoch_acc, 'train_val_loss': epoch_loss})
 
         time_elapsed = time.time() - since
         LOGGER.info(
@@ -543,6 +545,7 @@ class ClassifierModel:
                     epoch_recall
                 )
             )
+            wandb.log({'fine_acc': epoch_acc, 'fine_loss': epoch_loss})
             epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.valid_one_epoch()
             LOGGER.info(
                 "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
@@ -554,7 +557,7 @@ class ClassifierModel:
                     epoch_recall
                 )
             )
-            wandb.log({'epoch': epoch, 'epoch_loss_val': epoch_loss, 'epoch_acc_val': epoch_acc})
+            wandb.log({'fine_epoch': epoch, 'fine_loss_val': epoch_loss, 'fine_acc_val': epoch_acc})
 
         time_elapsed = time.time() - since
         LOGGER.info(
@@ -563,7 +566,7 @@ class ClassifierModel:
             )
         )
         LOGGER.info("Best val accuracy: {:4f}".format(trainer.best_acc))
-        wandb.log({'best_val_acc': trainer.best_acc})
+        wandb.log({'fine_best_val_acc': trainer.best_acc})
         # load best model weights
         self.net.load_state_dict(trainer.best_model_wts)
         # don't save the finetuned model for any folds
