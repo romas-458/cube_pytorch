@@ -45,7 +45,7 @@ def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width,
     monitor = Monitor()
     pytorch_model.train_from_csv(path_to_datajson, examples, monitor, terminator)
 
-def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, config, default_base_path = "models/resnext101_32x8d-8ba56ff5.pth", default_model_path = "models/cube_resnext101.pth"):
+def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, config, feature_extract = True, default_base_path = "models/resnext101_32x8d-8ba56ff5.pth", default_model_path = "models/cube_resnext101.pth"):
     LOGGER.info("Initializing components")
     ROOT_DIR = root_dir #"/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     model_path = os.path.join(ROOT_DIR, "model.pth")
@@ -63,7 +63,7 @@ def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
         width = width,
         height = height,
         #
-        feature_extract = False,
+        feature_extract = feature_extract,
         trained_model_path = ai_default_model_path,
         #wandb
         finetune_layer = config.finetune_layer,
