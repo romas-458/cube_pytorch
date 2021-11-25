@@ -20,10 +20,10 @@ LOGGER.setLevel(logging.INFO)
 
 # examples = [okb_class, okt_class, nokb_class, nokt_class]
 
-def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, ft_layers = 270):
+def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, save_model_path = "model.pth", ft_layers = 270):
     LOGGER.info("Initializing components")
     ROOT_DIR = root_dir #"/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
-    model_path = os.path.join(ROOT_DIR, "model.pth")
+    model_path = os.path.join(ROOT_DIR, save_model_path)
     ai_default_model_path = os.path.join(ROOT_DIR, "models/cube_resnext101.pth")  # path to save model
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
     ai_nok_threshold = 0.5
