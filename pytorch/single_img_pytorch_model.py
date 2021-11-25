@@ -10,6 +10,8 @@ from sklearn.utils import class_weight
 import cv2
 from PIL import Image
 
+import wandb
+
 import torch
 import torch.nn as nn
 
@@ -550,6 +552,8 @@ class ClassifierModel:
                     epoch_recall
                 )
             )
+            wandb.log({'epoch': epoch, 'epoch_loss_val': epoch_loss, 'epoch_acc_val': epoch_acc})
+
         time_elapsed = time.time() - since
         LOGGER.info(
             "Training complete in {:.0f}m {:.0f}s".format(
@@ -557,6 +561,7 @@ class ClassifierModel:
             )
         )
         LOGGER.info("Best val accuracy: {:4f}".format(trainer.best_acc))
+        wandb.log({'best_val_acc': trainer.best_acc})
         # load best model weights
         self.net.load_state_dict(trainer.best_model_wts)
         # don't save the finetuned model for any folds
