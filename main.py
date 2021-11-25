@@ -64,7 +64,7 @@ def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
         height = height,
         #
         feature_extract = False,
-        trained_model_path = default_model_path,
+        trained_model_path = ai_default_model_path,
         #wandb
         finetune_layer = config.finetune_layer,
         finetune_lr_multiplier = config.finetune_lr_multiplier,
