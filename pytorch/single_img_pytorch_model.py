@@ -460,7 +460,7 @@ class ClassifierModel:
             num_workers=self.num_workers,
             shuffle=False
         )
-        eval_monitor.total_images = len(eval_loader) * self.batch_size
+        # eval_monitor.total_images = len(eval_loader) * self.batch_size
         all_preds = []
         preds = []
         model.eval()
@@ -481,7 +481,7 @@ class ClassifierModel:
                     prob = prob.tolist()
                     all_preds.extend(prob)
 
-                    eval_monitor.evaluated_images += self.batch_size
+                    # eval_monitor.evaluated_images += self.batch_size
                     if eval_terminator.terminate_flag:
                         eval_terminator.reset()
                         raise KeyboardInterrupt
