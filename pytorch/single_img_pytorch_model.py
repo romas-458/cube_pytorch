@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.utils import class_weight
 import cv2
 from PIL import Image
+from sklearn import metrics
 
 import wandb
 
@@ -80,6 +81,9 @@ class ClassifierModel:
             finetune_max_lr_multiplier: int = 10,
             finetune_epochs: int = 20,
             finetune_embed_dim: int = 256,
+            #
+            eval_examples = None,
+            path_to_datajson = None,
 
     ):
         set_global_seeds()
@@ -118,6 +122,9 @@ class ClassifierModel:
         self.finetune_lr_multiplier = finetune_lr_multiplier
         self.finetune_max_lr_multiplier = finetune_max_lr_multiplier
         self.finetune_epochs = finetune_epochs
+        #
+        self.eval_examples = eval_examples
+        self.path_to_datajson = path_to_datajson
 
     def _init_model(self):
         LOGGER.info("Initializing model from given weights")
@@ -417,6 +424,74 @@ class ClassifierModel:
             LOGGER.info("Evaluation interrupted")
         return eval_df, preds
 
+    def evaluate_from_csv_each_epoch(self, path, costume_classes, model, eval_monitor: EvaluationMonitor,
+                 eval_terminator: Terminator) -> List:
+        """
+        Evaluation
+
+        Args:
+            eval_df (pd.DataFrame): Dataframe containing image file names
+            local_storage_dir (str): Path to eval images
+            eval_monitor (EvaluationMonitor): Monitor the progress of evaluating dataset
+            eval_terminator (Terminator) : Check if there is a termination signal
+        Returns:
+            preds (List): List of aggregated predictions
+        """
+
+        eval_df = prepare_df_from_json(path_to_datajson=path, needed_classes=costume_classes)
+        LOGGER.info("size of DF" + str(len(eval_df)))
+        LOGGER.info("DF head")
+        LOGGER.info(eval_df.head())
+        # eval_df = self._prepare_df(eval_df)
+        val_transforms = get_val_transforms(
+            self.height, self.width, self.means, self.stds
+        )
+        eval_batch = CubeDataset(
+            x=list(eval_df["file"]),
+            y=None,
+            root_dir=self.train_path,
+            transform=val_transforms
+        )
+        # NOTE: batch size should be a multiple of self.parallel_networks
+        eval_loader = torch.utils.data.DataLoader(
+            eval_batch,
+            batch_size=self.batch_size,
+            pin_memory=True,
+            num_workers=self.num_workers,
+            shuffle=False
+        )
+        eval_monitor.total_images = len(eval_loader) * self.batch_size
+        all_preds = []
+        preds = []
+        model.eval()
+        try:
+            with torch.no_grad():
+                for _, (data) in tqdm(
+                        enumerate(eval_loader), total=len(eval_loader), position=0
+                ):
+                    data = data.to(device, non_blocking=True)
+                    output = model(data)
+                    prob = torch.sigmoid(output).cpu().numpy()
+                    # aggregate the predictions in groups of self.parallel_networks
+                    # for i in range(0, len(prob), self.parallel_networks):
+                    #     all_preds.append(
+                    #         list(np.mean(prob[i: i + self.parallel_networks], axis=0))
+                    #     )
+
+                    prob = prob.tolist()
+                    all_preds.extend(prob)
+
+                    eval_monitor.evaluated_images += self.batch_size
+                    if eval_terminator.terminate_flag:
+                        eval_terminator.reset()
+                        raise KeyboardInterrupt
+            # instead of storing max prediction store column 1 prediction and use it for thresholding
+            for x in all_preds:
+                preds.append(x[1])
+        except KeyboardInterrupt:
+            LOGGER.info("Evaluation interrupted")
+        return eval_df, preds
+
     def train_pretrain_wandb(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
                        terminator: Terminator, is_kfold: bool = False, f: int = -1, base_model_path: str = "",
                        folds: int = -1) -> float:
@@ -483,6 +558,98 @@ class ClassifierModel:
             )
 
             wandb.log({'train_epoch': epoch, 'train_val_acc': epoch_acc, 'train_val_loss': epoch_loss})
+
+        time_elapsed = time.time() - since
+        LOGGER.info(
+            "Training complete in {:.0f}m {:.0f}s".format(
+                time_elapsed // 60, time_elapsed % 60
+            )
+        )
+        LOGGER.info("Best val accuracy: {:4f}".format(trainer.best_acc))
+        # load best model weights
+        self.net.load_state_dict(trainer.best_model_wts)
+        LOGGER.info(f"Saving best pretrained model at {self.save_model_path}")
+        torch.save(self.net, self.save_model_path)
+        return trainer.best_acc
+
+    def train_pretrain_wandb_each_epoch(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
+                       terminator: Terminator, is_kfold: bool = False, f: int = -1, base_model_path: str = "",
+                       folds: int = -1) -> float:
+        """
+        Train a pretrained model
+
+        Args:
+            cws (np.ndarray): A numpy array of class weights corresponding to each label
+            train_loader_length (int): Length of train dataloader
+            dataloaders_dict (Dict): A dict containing train and val dataloader with keys train and val
+            monitor (Monitor) : monitor the current batch and epoch of the training loop
+            terminator (Terminator) : check if there is any termination request
+            is_kfold (bool): whether training is using kfold dataset
+            f (int): integer corresponding to current fold number
+            base_model_path (str) : a base path with only model name
+            folds (int) : Number of kfolds used for scaling progress
+        Returns:
+            best_val_acc (float): Best validation accuracy
+        """
+        self.net = self._build_pretrain_model()
+        t_parameters = [p for p in self.net.parameters() if p.requires_grad]
+        criterion = nn.BCEWithLogitsLoss(weight=torch.from_numpy(cws)).to(device)
+        optimizer = torch.optim.AdamW(t_parameters, lr=self.lr, amsgrad=True)
+        # one cycle scheduler
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=self.lr * 100,
+            steps_per_epoch=train_loader_length,
+            epochs=self.epochs
+        )
+        if is_kfold:
+            self.save_model_path = base_model_path.split(".pth")[0] + f"_{f}_fold.pth"
+        trainer = Trainer(model=self.net, dataloaders=dataloaders_dict, num_classes=self.num_classes,
+                          input_channels=self.input_channels, criterion=criterion, optimizer=optimizer,
+                          scheduler=scheduler, num_epochs=self.epochs, device=device, monitor=monitor,
+                          terminator=terminator, finetune=True, folds=folds, parallel_networks=self.parallel_networks,
+                          nok_threshold=self.nok_threshold)
+        since = time.time()
+        for epoch in range(1, self.epochs+1):
+            LOGGER.info(f"\n{'--'*5} EPOCH: {epoch} | {self.epochs} {'--'*5}\n")
+            epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.train_one_epoch()
+            LOGGER.info(
+                "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
+                    'train',
+                    epoch_loss,
+                    epoch_acc,
+                    epoch_f1,
+                    epoch_precision,
+                    epoch_recall
+                )
+            )
+
+            wandb.log({'train_acc': epoch_acc, 'train_loss': epoch_loss})
+
+            epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.valid_one_epoch()
+            LOGGER.info(
+                "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
+                    'valid',
+                    epoch_loss,
+                    epoch_acc,
+                    epoch_f1,
+                    epoch_precision,
+                    epoch_recall
+                )
+            )
+
+            wandb.log({'train_epoch': epoch, 'train_val_acc': epoch_acc, 'train_val_loss': epoch_loss})
+
+            eval_df, preds = self.evaluate_from_csv_each_epoch(self.path_to_datajson, self.eval_examples, trainer.model, monitor,
+                                              terminator)
+
+            predictions = [0 if x < self.nok_threshold else 1 for x in preds]
+            LOGGER.info("predictions len = " + str(len(predictions)) + 'eval len = ' + str(len(eval_df)))
+            assert len(predictions) == len(eval_df)
+            # NOTE works only for binary case
+            tn, fp, fn, tp = metrics.confusion_matrix(eval_df["label"].values, predictions).ravel()
+            print('tn= ' + str(tn) + 'fp= ' + str(fp) + 'fn= ' + str(fn) + 'tp= ' + str(tp))
+            wandb.log({'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp})
 
         time_elapsed = time.time() - since
         LOGGER.info(
@@ -635,6 +802,96 @@ class ClassifierModel:
                 )
             )
             wandb.log({'fine_epoch': epoch, 'fine_loss_val': epoch_loss, 'fine_acc_val': epoch_acc})
+
+        time_elapsed = time.time() - since
+        LOGGER.info(
+            "Training complete in {:.0f}m {:.0f}s".format(
+                time_elapsed // 60, time_elapsed % 60
+            )
+        )
+        LOGGER.info("Best val accuracy: {:4f}".format(trainer.best_acc))
+        wandb.log({'fine_best_val_acc': trainer.best_acc})
+        # load best model weights
+        self.net.load_state_dict(trainer.best_model_wts)
+        # don't save the finetuned model for any folds
+        if not is_kfold:
+            torch.save(self.net, self.save_model_path)
+            LOGGER.info(f"Saving best finetuned model at {self.save_model_path}")
+        return trainer.best_acc
+
+    def train_finetune_wandb_each_epoch(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
+                       terminator: Terminator, is_kfold: bool = False, folds: int = -1) -> float:
+        """
+        Finetune a pretrained model
+
+        Args:
+            cws (np.ndarray): A numpy array of class weights corresponding to each label
+            train_loader_length (int): Length of train dataloader
+            dataloaders_dict (Dict): A dict containing train and val dataloader with keys train and val
+            monitor (Monitor) : monitor the current batch and epoch of the training loop
+            terminator (Terminator) : check if there is any termination request
+            is_kfold (bool): whether training is using kfold dataset
+            folds (int) : Number of kfolds used for scaling progress
+        Returns:
+            best_val_acc (float): Best validation accuracy
+        """
+        self.trained_model_path = self.save_model_path
+        self.net = self._build_finetune_model()
+        t_parameters = [p for p in self.net.parameters() if p.requires_grad]
+        criterion = nn.BCEWithLogitsLoss(weight=torch.from_numpy(cws)).to(device)
+        optimizer = torch.optim.AdamW(t_parameters, lr=self.lr * self.finetune_lr_multiplier, amsgrad=True)
+        # one cycle scheduler
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=self.lr * self.finetune_max_lr_multiplier,
+            steps_per_epoch=train_loader_length,
+            # epochs=self.epochs
+            epochs = self.finetune_epochs
+        )
+        trainer = Trainer(model=self.net, dataloaders=dataloaders_dict, num_classes=self.num_classes,
+                          input_channels=self.input_channels, criterion=criterion, optimizer=optimizer,
+                          scheduler=scheduler, num_epochs=self.finetune_epochs, device=device, monitor=monitor,
+                          terminator=terminator, finetune=True, folds=folds, parallel_networks=self.parallel_networks,
+                          nok_threshold=self.nok_threshold)
+        since = time.time()
+        for epoch in range(1, self.finetune_epochs+1):
+            LOGGER.info(f"\n{'--'*5} EPOCH: {epoch} | {self.finetune_epochs} {'--'*5}\n")
+            epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.train_one_epoch()
+            LOGGER.info(
+                "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
+                    'train',
+                    epoch_loss,
+                    epoch_acc,
+                    epoch_f1,
+                    epoch_precision,
+                    epoch_recall
+                )
+            )
+            wandb.log({'fine_acc': epoch_acc, 'fine_loss': epoch_loss})
+            epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.valid_one_epoch()
+            LOGGER.info(
+                "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
+                    'valid',
+                    epoch_loss,
+                    epoch_acc,
+                    epoch_f1,
+                    epoch_precision,
+                    epoch_recall
+                )
+            )
+            wandb.log({'fine_epoch': epoch, 'fine_loss_val': epoch_loss, 'fine_acc_val': epoch_acc})
+
+            eval_df, preds = self.evaluate_from_csv_each_epoch(self.path_to_datajson, self.eval_examples, trainer.model,
+                                                               monitor,
+                                                               terminator)
+
+            predictions = [0 if x < self.nok_threshold else 1 for x in preds]
+            LOGGER.info("predictions len = " + str(len(predictions)) + 'eval len = ' + str(len(eval_df)))
+            assert len(predictions) == len(eval_df)
+            # NOTE works only for binary case
+            tn, fp, fn, tp = metrics.confusion_matrix(eval_df["label"].values, predictions).ravel()
+            print('tn= ' + str(tn) + 'fp= ' + str(fp) + 'fn= ' + str(fn) + 'tp= ' + str(tp))
+            wandb.log({'tn_fine': tn, 'fp_fine': fp, 'fn_fine': fn, 'tp_fine': tp})
 
         time_elapsed = time.time() - since
         LOGGER.info(
@@ -808,6 +1065,54 @@ class ClassifierModel:
             if self.finetune_layer != -1:
                 LOGGER.info("Start finetuning pretrained model")
                 _ = self.train_finetune_wandb(cws, train_loader_length, dataloaders_dict, monitor, terminator)
+        except KeyboardInterrupt:
+            LOGGER.info("Training interrupted")
+            self.net = self._init_model()
+
+    def train_from_csv_wandb_eval_each_epoch(self, path, costume_classes, monitor: Monitor, terminator: Terminator):
+        """
+        Training
+        First perform a training of pretrained model.
+        If arguments of finetuning are passed, perform a finetuning using weights of above pretrained model.
+
+        Args:
+            train_df (pd.DataFrame) : Dataframe containing image file names, labels and sublabel
+            monitor (Monitor) : monitor the current batch and epoch of the training loop
+            terminator (Terminator) : check if there is any termination request
+        """
+        # train_df = self._prepare_df(train_df)
+
+        train_df = prepare_df_from_json(path_to_datajson=path, needed_classes=costume_classes)
+
+        train_y = train_df["label"]
+
+        # cws = class_weight.compute_class_weight("balanced", np.unique(train_y), train_y)
+
+        cws = class_weight.compute_class_weight(
+            class_weight="balanced",
+            classes=np.unique(train_y),
+            y=train_y
+        )
+        # cws = dict(zip(np.unique(train_y), cws))
+
+        LOGGER.info(f"Class weights for labels: {cws}")
+
+        LOGGER.info("Loading data")
+        train_loader, val_loader = self._prepare_training_generators(
+            train_df, self.train_path
+        )
+        train_loader_length = len(train_loader)
+        # Create training and validation dataloaders
+        dataloaders_dict = {"train": train_loader, "val": val_loader}
+        try:
+            # train a pretrained model
+            if self.feature_extract:
+                LOGGER.info("Start training pretrained models")
+                _ = self.train_pretrain_wandb_each_epoch(cws, train_loader_length, dataloaders_dict, monitor, terminator, False)
+            # finetune a pretrained model
+            if self.finetune_layer != -1:
+                LOGGER.info("Start finetuning pretrained model")
+                _ = self.train_finetune_wandb_each_epoch(cws, train_loader_length, dataloaders_dict, monitor, terminator)
         except KeyboardInterrupt:
             LOGGER.info("Training interrupted")
             self.net = self._init_model()
