@@ -75,7 +75,7 @@ def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
 
     terminator = Terminator()
     monitor = Monitor()
-    pytorch_model.train_from_csv(path_to_datajson, examples, monitor, terminator)
+    pytorch_model.train_from_csv_wandb(path_to_datajson, examples, monitor, terminator)
     # pytorch_model.train_from_csv_wandb(path_to_datajson, examples_train, monitor, terminator)
 
 def evaluation_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model):

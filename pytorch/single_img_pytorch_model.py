@@ -417,7 +417,7 @@ class ClassifierModel:
             LOGGER.info("Evaluation interrupted")
         return eval_df, preds
 
-    def train_pretrain(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
+    def train_pretrain_wandb(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
                        terminator: Terminator, is_kfold: bool = False, f: int = -1, base_model_path: str = "",
                        folds: int = -1) -> float:
         """
@@ -497,7 +497,84 @@ class ClassifierModel:
         torch.save(self.net, self.save_model_path)
         return trainer.best_acc
 
-    def train_finetune(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
+    def train_pretrain(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
+                       terminator: Terminator, is_kfold: bool = False, f: int = -1, base_model_path: str = "",
+                       folds: int = -1) -> float:
+        """
+        Train a pretrained model
+
+        Args:
+            cws (np.ndarray): A numpy array of class weights corresponding to each label
+            train_loader_length (int): Length of train dataloader
+            dataloaders_dict (Dict): A dict containing train and val dataloader with keys train and val
+            monitor (Monitor) : monitor the current batch and epoch of the training loop
+            terminator (Terminator) : check if there is any termination request
+            is_kfold (bool): whether training is using kfold dataset
+            f (int): integer corresponding to current fold number
+            base_model_path (str) : a base path with only model name
+            folds (int) : Number of kfolds used for scaling progress
+        Returns:
+            best_val_acc (float): Best validation accuracy
+        """
+        self.net = self._build_pretrain_model()
+        t_parameters = [p for p in self.net.parameters() if p.requires_grad]
+        criterion = nn.BCEWithLogitsLoss(weight=torch.from_numpy(cws)).to(device)
+        optimizer = torch.optim.AdamW(t_parameters, lr=self.lr, amsgrad=True)
+        # one cycle scheduler
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=self.lr * 100,
+            steps_per_epoch=train_loader_length,
+            epochs=self.epochs
+        )
+        if is_kfold:
+            self.save_model_path = base_model_path.split(".pth")[0] + f"_{f}_fold.pth"
+        trainer = Trainer(model=self.net, dataloaders=dataloaders_dict, num_classes=self.num_classes,
+                          input_channels=self.input_channels, criterion=criterion, optimizer=optimizer,
+                          scheduler=scheduler, num_epochs=self.epochs, device=device, monitor=monitor,
+                          terminator=terminator, finetune=True, folds=folds, parallel_networks=self.parallel_networks,
+                          nok_threshold=self.nok_threshold)
+        since = time.time()
+        for epoch in range(1, self.epochs+1):
+            LOGGER.info(f"\n{'--'*5} EPOCH: {epoch} | {self.epochs} {'--'*5}\n")
+            epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.train_one_epoch()
+            LOGGER.info(
+                "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
+                    'train',
+                    epoch_loss,
+                    epoch_acc,
+                    epoch_f1,
+                    epoch_precision,
+                    epoch_recall
+                )
+            )
+
+            epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.valid_one_epoch()
+            LOGGER.info(
+                "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
+                    'valid',
+                    epoch_loss,
+                    epoch_acc,
+                    epoch_f1,
+                    epoch_precision,
+                    epoch_recall
+                )
+            )
+
+        time_elapsed = time.time() - since
+        LOGGER.info(
+            "Training complete in {:.0f}m {:.0f}s".format(
+                time_elapsed // 60, time_elapsed % 60
+            )
+        )
+        LOGGER.info("Best val accuracy: {:4f}".format(trainer.best_acc))
+        # load best model weights
+        self.net.load_state_dict(trainer.best_model_wts)
+        LOGGER.info(f"Saving best pretrained model at {self.save_model_path}")
+        torch.save(self.net, self.save_model_path)
+        return trainer.best_acc
+
+    def train_finetune_wandb(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
                        terminator: Terminator, is_kfold: bool = False, folds: int = -1) -> float:
         """
         Finetune a pretrained model
@@ -575,6 +652,82 @@ class ClassifierModel:
             LOGGER.info(f"Saving best finetuned model at {self.save_model_path}")
         return trainer.best_acc
 
+    def train_finetune(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
+                       terminator: Terminator, is_kfold: bool = False, folds: int = -1) -> float:
+        """
+        Finetune a pretrained model
+
+        Args:
+            cws (np.ndarray): A numpy array of class weights corresponding to each label
+            train_loader_length (int): Length of train dataloader
+            dataloaders_dict (Dict): A dict containing train and val dataloader with keys train and val
+            monitor (Monitor) : monitor the current batch and epoch of the training loop
+            terminator (Terminator) : check if there is any termination request
+            is_kfold (bool): whether training is using kfold dataset
+            folds (int) : Number of kfolds used for scaling progress
+        Returns:
+            best_val_acc (float): Best validation accuracy
+        """
+        self.trained_model_path = self.save_model_path
+        self.net = self._build_finetune_model()
+        t_parameters = [p for p in self.net.parameters() if p.requires_grad]
+        criterion = nn.BCEWithLogitsLoss(weight=torch.from_numpy(cws)).to(device)
+        optimizer = torch.optim.AdamW(t_parameters, lr=self.lr * self.finetune_lr_multiplier, amsgrad=True)
+        # one cycle scheduler
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=self.lr * self.finetune_max_lr_multiplier,
+            steps_per_epoch=train_loader_length,
+            # epochs=self.epochs
+            epochs = self.finetune_epochs
+        )
+        trainer = Trainer(model=self.net, dataloaders=dataloaders_dict, num_classes=self.num_classes,
+                          input_channels=self.input_channels, criterion=criterion, optimizer=optimizer,
+                          scheduler=scheduler, num_epochs=self.finetune_epochs, device=device, monitor=monitor,
+                          terminator=terminator, finetune=True, folds=folds, parallel_networks=self.parallel_networks,
+                          nok_threshold=self.nok_threshold)
+        since = time.time()
+        for epoch in range(1, self.finetune_epochs+1):
+            LOGGER.info(f"\n{'--'*5} EPOCH: {epoch} | {self.finetune_epochs} {'--'*5}\n")
+            epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.train_one_epoch()
+            LOGGER.info(
+                "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
+                    'train',
+                    epoch_loss,
+                    epoch_acc,
+                    epoch_f1,
+                    epoch_precision,
+                    epoch_recall
+                )
+            )
+
+            epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.valid_one_epoch()
+            LOGGER.info(
+                "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
+                    'valid',
+                    epoch_loss,
+                    epoch_acc,
+                    epoch_f1,
+                    epoch_precision,
+                    epoch_recall
+                )
+            )
+
+        time_elapsed = time.time() - since
+        LOGGER.info(
+            "Training complete in {:.0f}m {:.0f}s".format(
+                time_elapsed // 60, time_elapsed % 60
+            )
+        )
+        LOGGER.info("Best val accuracy: {:4f}".format(trainer.best_acc))
+        # load best model weights
+        self.net.load_state_dict(trainer.best_model_wts)
+        # don't save the finetuned model for any folds
+        if not is_kfold:
+            torch.save(self.net, self.save_model_path)
+            LOGGER.info(f"Saving best finetuned model at {self.save_model_path}")
+        return trainer.best_acc
+
     def train(self, train_df: pd.DataFrame, monitor: Monitor, terminator: Terminator):
         """
         Training
@@ -607,6 +760,54 @@ class ClassifierModel:
             if self.finetune_layer != -1:
                 LOGGER.info("Start finetuning pretrained model")
                 _ = self.train_finetune(cws, train_loader_length, dataloaders_dict, monitor, terminator)
+        except KeyboardInterrupt:
+            LOGGER.info("Training interrupted")
+            self.net = self._init_model()
+
+    def train_from_csv_wandb(self, path, costume_classes, monitor: Monitor, terminator: Terminator):
+        """
+        Training
+        First perform a training of pretrained model.
+        If arguments of finetuning are passed, perform a finetuning using weights of above pretrained model.
+
+        Args:
+            train_df (pd.DataFrame) : Dataframe containing image file names, labels and sublabel
+            monitor (Monitor) : monitor the current batch and epoch of the training loop
+            terminator (Terminator) : check if there is any termination request
+        """
+        # train_df = self._prepare_df(train_df)
+
+        train_df = prepare_df_from_json(path_to_datajson=path, needed_classes=costume_classes)
+
+        train_y = train_df["label"]
+
+        # cws = class_weight.compute_class_weight("balanced", np.unique(train_y), train_y)
+
+        cws = class_weight.compute_class_weight(
+            class_weight="balanced",
+            classes=np.unique(train_y),
+            y=train_y
+        )
+        # cws = dict(zip(np.unique(train_y), cws))
+
+        LOGGER.info(f"Class weights for labels: {cws}")
+
+        LOGGER.info("Loading data")
+        train_loader, val_loader = self._prepare_training_generators(
+            train_df, self.train_path
+        )
+        train_loader_length = len(train_loader)
+        # Create training and validation dataloaders
+        dataloaders_dict = {"train": train_loader, "val": val_loader}
+        try:
+            # train a pretrained model
+            if self.feature_extract:
+                LOGGER.info("Start training pretrained models")
+                _ = self.train_pretrain_wandb(cws, train_loader_length, dataloaders_dict, monitor, terminator, False)
+            # finetune a pretrained model
+            if self.finetune_layer != -1:
+                LOGGER.info("Start finetuning pretrained model")
+                _ = self.train_finetune_wandb(cws, train_loader_length, dataloaders_dict, monitor, terminator)
         except KeyboardInterrupt:
             LOGGER.info("Training interrupted")
             self.net = self._init_model()
