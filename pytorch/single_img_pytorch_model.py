@@ -610,6 +610,9 @@ class ClassifierModel:
                           terminator=terminator, finetune=True, folds=folds, parallel_networks=self.parallel_networks,
                           nok_threshold=self.nok_threshold)
         since = time.time()
+
+        best_tntp = -1
+        best_epoch = -1
         for epoch in range(1, self.epochs+1):
             LOGGER.info(f"\n{'--'*5} EPOCH: {epoch} | {self.epochs} {'--'*5}\n")
             epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.train_one_epoch()
@@ -650,6 +653,14 @@ class ClassifierModel:
             tn, fp, fn, tp = metrics.confusion_matrix(eval_df["label"].values, predictions).ravel()
             print('tn= ' + str(tn) + 'fp= ' + str(fp) + 'fn= ' + str(fn) + 'tp= ' + str(tp))
             wandb.log({'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp})
+
+            tntp = tn + tp
+
+            if best_tntp < tntp:
+                best_tntp = tntp
+                best_epoch = epoch
+
+                wandb.log({'best_tntp': best_tntp, 'best_epoch': best_epoch})
 
         time_elapsed = time.time() - since
         LOGGER.info(
@@ -854,6 +865,10 @@ class ClassifierModel:
                           terminator=terminator, finetune=True, folds=folds, parallel_networks=self.parallel_networks,
                           nok_threshold=self.nok_threshold)
         since = time.time()
+
+        best_tntp = -1
+        best_epoch = -1
+
         for epoch in range(1, self.finetune_epochs+1):
             LOGGER.info(f"\n{'--'*5} EPOCH: {epoch} | {self.finetune_epochs} {'--'*5}\n")
             epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.train_one_epoch()
@@ -892,6 +907,14 @@ class ClassifierModel:
             tn, fp, fn, tp = metrics.confusion_matrix(eval_df["label"].values, predictions).ravel()
             print('tn= ' + str(tn) + 'fp= ' + str(fp) + 'fn= ' + str(fn) + 'tp= ' + str(tp))
             wandb.log({'tn_fine': tn, 'fp_fine': fp, 'fn_fine': fn, 'tp_fine': tp})
+
+            tntp = tn + tp
+
+            if best_tntp < tntp:
+                best_tntp = tntp
+                best_epoch = epoch
+
+                wandb.log({'best_tntp_fine': best_tntp, 'best_epoch_fine': best_epoch})
 
         time_elapsed = time.time() - since
         LOGGER.info(
