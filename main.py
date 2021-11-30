@@ -45,6 +45,32 @@ def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width,
     monitor = Monitor()
     pytorch_model.train_from_csv(path_to_datajson, examples, monitor, terminator)
 
+def main_check_val_loader(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, save_model_path = "model.pth", ft_layers = 270):
+    LOGGER.info("Initializing components")
+    ROOT_DIR = root_dir #"/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
+    model_path = os.path.join(ROOT_DIR, save_model_path)
+    ai_default_model_path = os.path.join(ROOT_DIR, "models/cube_resnext101.pth")  # path to save model
+    ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
+    ai_nok_threshold = 0.5
+    local_storage_dir = local_storage_dir # "/home/roman/Завантаження/Cube_project/Data 13.09.2021-20210921T124220Z-001/Data 13.09.2021/blob_storage"
+
+    pytorch_model = ClassifierModel(
+        save_model_path=model_path,
+        base_model_path=os.path.join(ROOT_DIR, ai_default_base_path),
+        train_path=os.path.join(ROOT_DIR, local_storage_dir),
+        nok_threshold=ai_nok_threshold,
+        epochs = epochs,
+        width = width,
+        height = height,
+        finetune_epochs = epochs,
+        finetune_layer = ft_layers,
+    )
+
+    terminator = Terminator()
+    monitor = Monitor()
+    dataloaders_dict = pytorch_model.train_from_csv_check_val_loader(path_to_datajson, examples, monitor, terminator)
+    return dataloaders_dict
+
 def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, config, feature_extract = True, default_base_path = "models/resnext101_32x8d-8ba56ff5.pth", default_model_path = "models/cube_resnext101.pth"):
     LOGGER.info("Initializing components")
     ROOT_DIR = root_dir #"/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"

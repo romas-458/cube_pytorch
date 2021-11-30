@@ -1188,6 +1188,56 @@ class ClassifierModel:
             LOGGER.info("Training interrupted")
             self.net = self._init_model()
 
+    def train_from_csv_check_val_loader(self, path, costume_classes, monitor: Monitor, terminator: Terminator):
+        """
+        Training
+        First perform a training of pretrained model.
+        If arguments of finetuning are passed, perform a finetuning using weights of above pretrained model.
+
+        Args:
+            train_df (pd.DataFrame) : Dataframe containing image file names, labels and sublabel
+            monitor (Monitor) : monitor the current batch and epoch of the training loop
+            terminator (Terminator) : check if there is any termination request
+        """
+        # train_df = self._prepare_df(train_df)
+
+        train_df = prepare_df_from_json(path_to_datajson=path, needed_classes=costume_classes)
+
+        train_y = train_df["label"]
+
+        # cws = class_weight.compute_class_weight("balanced", np.unique(train_y), train_y)
+
+        cws = class_weight.compute_class_weight(
+            class_weight="balanced",
+            classes=np.unique(train_y),
+            y=train_y
+        )
+        # cws = dict(zip(np.unique(train_y), cws))
+
+        LOGGER.info(f"Class weights for labels: {cws}")
+
+        LOGGER.info("Loading data")
+        train_loader, val_loader = self._prepare_training_generators(
+            train_df, self.train_path
+        )
+        train_loader_length = len(train_loader)
+        # Create training and validation dataloaders
+        dataloaders_dict = {"train": train_loader, "val": val_loader}
+        try:
+            # train a pretrained model
+            if self.feature_extract:
+                LOGGER.info("Start training pretrained models")
+                _ = self.train_pretrain(cws, train_loader_length, dataloaders_dict, monitor, terminator, False)
+            # finetune a pretrained model
+            if self.finetune_layer != -1:
+                LOGGER.info("Start finetuning pretrained model")
+                _ = self.train_finetune(cws, train_loader_length, dataloaders_dict, monitor, terminator)
+        except KeyboardInterrupt:
+            LOGGER.info("Training interrupted")
+            self.net = self._init_model()
+
+        return dataloaders_dict
+
     def train_k_folds(self, train_df: pd.DataFrame, monitor: Monitor, terminator: Terminator):
         """
         Training on stratified k-folds
