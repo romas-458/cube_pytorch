@@ -253,3 +253,71 @@ class Trainer:
                 self.best_acc = epoch_acc
             self.best_model_wts = copy.deepcopy(self.model.state_dict())
         return epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall
+
+    def valid_one_epoch_check_val_loader(self):
+        self.model.eval()  # Set model to evaluate mode
+        running_loss = 0.0
+        running_corrects = 0
+        f1s, recalls, precisions = [], [], []
+        agg_preds, agg_labels = [], []
+        if self.terminator.terminate_flag:
+            self.terminator.reset()
+            raise KeyboardInterrupt
+        stream = tqdm(self.valid_data, position=0, leave=True)
+        # Iterate over batch of data.
+        for _, (inputs, labels) in enumerate(stream):
+            inputs = inputs.to(self.device, non_blocking=True)
+            labels = labels.to(self.device, non_blocking=True)
+            # forward
+            # track history if only in train
+            with torch.set_grad_enabled(False):
+                outputs = self.model(inputs)
+                onehot_labels = torch.nn.functional.one_hot(labels, self.num_classes)
+                onehot_labels = onehot_labels.type_as(outputs)
+                loss = self.criterion(outputs, onehot_labels)
+                stream.set_description('val_loss: {:.2f}'.format(loss.item()))
+            # aggregate validation prediction results for kfold training
+            if self.folds != -1:
+                lbl = labels.cpu().detach().numpy()
+                prob = torch.sigmoid(outputs).cpu().detach().numpy()
+                # aggregate the predictions in groups of self.parallel_networks
+                # select only the mean predictions corresponding to first column
+                for i in range(0, len(prob), self.parallel_networks):
+                    agg_preds.append(np.mean(prob[i: i + self.parallel_networks], axis=0)[1])
+                    agg_labels.append(lbl[i])
+            # statistics
+            _, preds = torch.max(outputs, 1)
+            f1s.append(
+                metrics.f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average="macro")
+            )
+            precisions.append(
+                metrics.precision_score(labels.cpu().numpy(), preds.cpu().numpy(), average="macro")
+            )
+            recalls.append(
+                metrics.recall_score(labels.cpu().numpy(), preds.cpu().numpy(), average="macro")
+            )
+            running_loss += loss.item() * inputs.size(0)
+            running_corrects += torch.sum(preds == labels.data)
+            if self.terminator.terminate_flag:
+                self.terminator.reset()
+                raise KeyboardInterrupt
+
+        epoch_loss = running_loss / (len(self.valid_data.dataset))
+        epoch_acc = (running_corrects.double() / (len(self.valid_data.dataset))).item()
+        epoch_f1 = np.mean(f1s)
+        epoch_precision = np.mean(precisions)
+        epoch_recall = np.mean(recalls)
+        # deep copy the model
+        if epoch_acc > self.best_acc:
+            if self.folds != -1:
+                # calculate aggregated accuracy
+                agg_preds = [0 if x < self.nok_threshold else 1 for x in agg_preds]
+                assert len(agg_labels) == len(agg_preds)
+                agg_acc = np.sum(np.array(agg_labels) == np.array(agg_preds)) / len(agg_preds)
+                LOGGER.info(f"Val acc improved from {self.best_acc} to {agg_acc}.")
+                self.best_acc = agg_acc
+            else:
+                LOGGER.info(f"Val acc improved from {self.best_acc} to {epoch_acc}.")
+                self.best_acc = epoch_acc
+            self.best_model_wts = copy.deepcopy(self.model.state_dict())
+        return epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall
