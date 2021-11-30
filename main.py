@@ -208,7 +208,7 @@ def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
     assert len(predictions) == len(eval_df)
     # NOTE works only for binary case
     tn, fp, fn, tp = metrics.confusion_matrix(eval_df["label"].values, predictions).ravel()
-    print('tn= ' + str(tn) + 'fp= ' + str(fp) + 'fn= '+ str(fn) + 'tp= '+ str(tp)
+    print('tn= ' + str(tn) + 'fp= ' + str(fp) + 'fn= '+ str(fn) + 'tp= '+ str(tp))
 
 def evaluation_check_df(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model):
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
