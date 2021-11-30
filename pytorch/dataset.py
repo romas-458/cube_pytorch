@@ -83,6 +83,6 @@ class CubeDatasetPath(Dataset):
         if self.transform is not None:
             img = self.transform(image=img)["image"]
         if self.lbls is not None:
-            return img, self.lbls[idx]
+            return img, self.lbls[idx], img_filename
         else:
-            return img, img_filename
+            return img
