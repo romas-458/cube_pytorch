@@ -125,6 +125,67 @@ class Trainer:
         epoch_recall = np.mean(recalls)
         return epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall
 
+    def train_one_epoch_check_val_loader(self):
+        self.model.train()  # Set model to training mode
+        self.monitor.batches_per_epoch = len(self.train_data)
+        running_loss = 0.0
+        running_corrects = 0
+        f1s, recalls, precisions = [], [], []
+        if self.terminator.terminate_flag:
+            self.terminator.reset()
+            raise KeyboardInterrupt
+        stream = tqdm(self.train_data, position=0, leave=True)
+        # Iterate over batch of data.
+        for _, (inputs, labels, _) in enumerate(stream):
+            labels = torch.from_numpy(np.array(labels))
+            # inputs = torch.from_numpy(np.asarray(inputs))
+            # labels = torch.as_tensor(labels)
+            inputs = inputs.to(self.device, non_blocking=True)
+            labels = labels.to(self.device, non_blocking=True)
+            # zero the parameter gradients
+            self.optimizer.zero_grad(set_to_none=True)
+            # forward
+            # track history if only in train
+            with torch.set_grad_enabled(True):
+                # Get model outputs and calculate loss
+                # backward + optimize only if in training phase
+                outputs = self.model(inputs)
+                onehot_labels = torch.nn.functional.one_hot(labels, self.num_classes)
+                onehot_labels = onehot_labels.type_as(outputs)
+                loss = self.criterion(outputs, onehot_labels)
+                stream.set_description('train_loss: {:.2f}'.format(loss.item()))
+                loss.backward()
+                self.optimizer.step()
+            # statistics
+            _, preds = torch.max(outputs, 1)
+            f1s.append(
+                metrics.f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average="macro")
+            )
+            precisions.append(
+                metrics.precision_score(labels.cpu().numpy(), preds.cpu().numpy(), average="macro")
+            )
+            recalls.append(
+                metrics.recall_score(labels.cpu().numpy(), preds.cpu().numpy(), average="macro")
+            )
+            running_loss += loss.item() * inputs.size(0)
+            running_corrects += torch.sum(preds == labels.data)
+            # monitor only training dataset
+            self.monitor.current_batch += 1
+            if self.terminator.terminate_flag:
+                self.terminator.reset()
+                raise KeyboardInterrupt
+        self.scheduler.step()
+        # monitor only training dataset
+        self.monitor.current_batch = 0
+        self.monitor.current_epoch += 1
+
+        epoch_loss = running_loss / (len(self.train_data.dataset))
+        epoch_acc = (running_corrects.double() / (len(self.train_data.dataset))).item()
+        epoch_f1 = np.mean(f1s)
+        epoch_precision = np.mean(precisions)
+        epoch_recall = np.mean(recalls)
+        return epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall
+
     def valid_one_epoch(self):
         self.model.eval()  # Set model to evaluate mode
         running_loss = 0.0

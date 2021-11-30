@@ -16,7 +16,7 @@ import wandb
 import torch
 import torch.nn as nn
 
-from cube_pytorch.pytorch.dataset import CubeDataset
+from cube_pytorch.pytorch.dataset import CubeDataset, CubeDatasetPath
 from cube_pytorch.pytorch.model import build_models
 from cube_pytorch.pytorch.train_loop import Trainer
 from cube_pytorch.pytorch.utils import Monitor, Terminator, get_train_transforms, get_val_transforms, \
@@ -225,6 +225,72 @@ class ClassifierModel:
             x=list(train_x), y=list(train_y), root_dir=train_root_dir, transform=trn_transforms
         )
         val_dataset = CubeDataset(
+            x=list(val_x), y=list(val_y), root_dir=train_root_dir, transform=val_transforms
+        )
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset,
+            batch_size=self.batch_size,
+            pin_memory=True,
+            num_workers=self.num_workers,
+            shuffle=True
+        )
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset,
+            batch_size=self.batch_size,
+            pin_memory=True,
+            num_workers=self.num_workers,
+            shuffle=False
+        )
+        return train_loader, val_loader
+
+    def _prepare_training_generators_check_val_loader(self, train_df: pd.DataFrame, train_root_dir: str, is_kfold: bool = False,
+                                     fold: int = -1) -> tuple:
+        """
+        Prepare training and validation dataloaders
+
+        Args:
+            train_df (pd.DataFrame) : Dataframe containing 2 columns file and labels
+            train_root_dir (str) : Base path to images
+            is_kfold (bool): whether to create kfold dataloaders
+            fold (int) : integer corresponding to current fold number
+        Returns:
+            train_loader, val_loader (tuple) : A tuple of train and val dataloaders
+        """
+
+        if is_kfold:
+            df_train = train_df[train_df.kfold != fold].reset_index(drop=True)
+            df_val = train_df[train_df.kfold == fold].reset_index(drop=True)
+            train_x, train_y = df_train["file"], df_train["label"]
+            val_x, val_y = df_val["file"], df_val["label"]
+        else:
+            x = train_df["file"]
+            y = train_df["label"]
+
+            train_x, val_x, train_y, val_y = train_test_split(
+                x,
+                y,
+                test_size=self.split_ratio,
+                random_state=self.random_seed,
+                shuffle=True,
+                stratify=y
+            )
+        LOGGER.info(
+            f"Training shape: {train_x.shape}, {train_y.shape}, {np.unique(train_y, return_counts=True)}"
+        )
+        LOGGER.info(
+            f"Validation shape: {val_x.shape}, {val_y.shape}, {np.unique(val_y, return_counts=True)}"
+        )
+
+        trn_transforms = get_train_transforms(
+            self.height, self.width, self.means, self.stds
+        )
+        val_transforms = get_val_transforms(
+            self.height, self.width, self.means, self.stds
+        )
+        train_dataset = CubeDatasetPath(
+            x=list(train_x), y=list(train_y), root_dir=train_root_dir, transform=trn_transforms
+        )
+        val_dataset = CubeDatasetPath(
             x=list(val_x), y=list(val_y), root_dir=train_root_dir, transform=val_transforms
         )
         train_loader = torch.utils.data.DataLoader(
@@ -752,6 +818,83 @@ class ClassifierModel:
         torch.save(self.net, self.save_model_path)
         return trainer.best_acc
 
+    def train_pretrain_check_val_loader(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
+                       terminator: Terminator, is_kfold: bool = False, f: int = -1, base_model_path: str = "",
+                       folds: int = -1) -> float:
+        """
+        Train a pretrained model
+
+        Args:
+            cws (np.ndarray): A numpy array of class weights corresponding to each label
+            train_loader_length (int): Length of train dataloader
+            dataloaders_dict (Dict): A dict containing train and val dataloader with keys train and val
+            monitor (Monitor) : monitor the current batch and epoch of the training loop
+            terminator (Terminator) : check if there is any termination request
+            is_kfold (bool): whether training is using kfold dataset
+            f (int): integer corresponding to current fold number
+            base_model_path (str) : a base path with only model name
+            folds (int) : Number of kfolds used for scaling progress
+        Returns:
+            best_val_acc (float): Best validation accuracy
+        """
+        self.net = self._build_pretrain_model()
+        t_parameters = [p for p in self.net.parameters() if p.requires_grad]
+        criterion = nn.BCEWithLogitsLoss(weight=torch.from_numpy(cws)).to(device)
+        optimizer = torch.optim.AdamW(t_parameters, lr=self.lr, amsgrad=True)
+        # one cycle scheduler
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=self.lr * 100,
+            steps_per_epoch=train_loader_length,
+            epochs=self.epochs
+        )
+        if is_kfold:
+            self.save_model_path = base_model_path.split(".pth")[0] + f"_{f}_fold.pth"
+        trainer = Trainer(model=self.net, dataloaders=dataloaders_dict, num_classes=self.num_classes,
+                          input_channels=self.input_channels, criterion=criterion, optimizer=optimizer,
+                          scheduler=scheduler, num_epochs=self.epochs, device=device, monitor=monitor,
+                          terminator=terminator, finetune=True, folds=folds, parallel_networks=self.parallel_networks,
+                          nok_threshold=self.nok_threshold)
+        since = time.time()
+        for epoch in range(1, self.epochs+1):
+            LOGGER.info(f"\n{'--'*5} EPOCH: {epoch} | {self.epochs} {'--'*5}\n")
+            epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.train_one_epoch_check_val_loader()
+            LOGGER.info(
+                "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
+                    'train',
+                    epoch_loss,
+                    epoch_acc,
+                    epoch_f1,
+                    epoch_precision,
+                    epoch_recall
+                )
+            )
+
+            epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.valid_one_epoch()
+            LOGGER.info(
+                "\nPhase: {} | Loss: {:.4f} | Accuracy: {:.4f} | F1: {:.4f} | Precision: {:.4f} | Recall: {:.4f}".format(
+                    'valid',
+                    epoch_loss,
+                    epoch_acc,
+                    epoch_f1,
+                    epoch_precision,
+                    epoch_recall
+                )
+            )
+
+        time_elapsed = time.time() - since
+        LOGGER.info(
+            "Training complete in {:.0f}m {:.0f}s".format(
+                time_elapsed // 60, time_elapsed % 60
+            )
+        )
+        LOGGER.info("Best val accuracy: {:4f}".format(trainer.best_acc))
+        # load best model weights
+        self.net.load_state_dict(trainer.best_model_wts)
+        LOGGER.info(f"Saving best pretrained model at {self.save_model_path}")
+        torch.save(self.net, self.save_model_path)
+        return trainer.best_acc
+
     def train_finetune_wandb(self, cws: np.ndarray, train_loader_length: int, dataloaders_dict: Dict, monitor: Monitor,
                        terminator: Terminator, is_kfold: bool = False, folds: int = -1) -> float:
         """
@@ -1217,7 +1360,7 @@ class ClassifierModel:
         LOGGER.info(f"Class weights for labels: {cws}")
 
         LOGGER.info("Loading data")
-        train_loader, val_loader = self._prepare_training_generators(
+        train_loader, val_loader = self._prepare_training_generators_check_val_loader(
             train_df, self.train_path
         )
         train_loader_length = len(train_loader)
@@ -1227,7 +1370,7 @@ class ClassifierModel:
             # train a pretrained model
             if self.feature_extract:
                 LOGGER.info("Start training pretrained models")
-                _ = self.train_pretrain(cws, train_loader_length, dataloaders_dict, monitor, terminator, False)
+                _ = self.train_pretrain_check_val_loader(cws, train_loader_length, dataloaders_dict, monitor, terminator, False)
             # finetune a pretrained model
             if self.finetune_layer != -1:
                 LOGGER.info("Start finetuning pretrained model")
