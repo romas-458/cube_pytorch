@@ -48,6 +48,48 @@ def prepare_df_from_json(path_to_datajson, needed_classes):
 
     return pd.DataFrame(data, columns=["file", "label", "subclass"])
 
+def prepare_df_from_json_per_object(path_to_datajson, needed_classes):
+    df = pd.read_json(path_to_datajson)
+    subdf = df[["image_urls", "class_type", "class_name"]]
+    training_subset = subdf[(subdf["class_name"] == needed_classes[0]) | (subdf["class_name"] == needed_classes[1]) | (
+                subdf["class_name"] == needed_classes[2]) | (subdf["class_name"] == needed_classes[3])]
+    data = []
+    training_subset = training_subset.copy()
+    training_subset["image_urls"] = training_subset.index
+    for urls, label, subclass in training_subset[["image_urls", "class_type", "class_name"]].values:
+        for i in range(4):
+            if label == 'OK':
+                label01 = 0
+            else:
+                label01 = 1
+            # data.append([take_filename(urls[i]), label, subclass])
+            data.append([take_filename(urls[i]), label01, subclass])
+
+    return pd.DataFrame(data, columns=["file", "label", "subclass"])
+#
+# def _prepare_df(self, dataframe: pd.DataFrame, is_kfold: bool = False) -> pd.DataFrame:
+#     """
+#     Prepare dataframe from raw dataset
+#
+#     Args:
+#         dataframe (pd.DataFrame) : Pandas dataframe of the original dataset
+#         is_kfold (bool) : Boolean to indicate if preparing is done for k-fold dataset
+#     Returns:
+#         pd.DataFrame : A dataframe containing 3 columns (file, label, subclass)
+#     """
+#     data = []
+#     dataframe = dataframe.copy()
+#     if is_kfold:
+#         for prefix, label, subclass, kfold in dataframe[["prefix", "label", "subclass", "kfold"]].values:
+#             for i in range(4):
+#                 data.append([f"{prefix}_{i}.jpg", label, subclass, kfold])
+#         return pd.DataFrame(data, columns=["file", "label", "subclass", "kfold"])
+#     else:
+#         dataframe["prefix"] = dataframe.index
+#         for prefix, label, subclass in dataframe[["prefix", "label", "subclass"]].values:
+#             for i in range(4):
+#                 data.append([f"{prefix}_{i}.jpg", label, subclass])
+#         return pd.DataFrame(data, columns=["file", "label", "subclass"])
 
 class ClassifierModel:
     def __init__(
@@ -504,7 +546,7 @@ class ClassifierModel:
             preds (List): List of aggregated predictions
         """
 
-        eval_df = prepare_df_from_json(path_to_datajson=path, needed_classes=costume_classes)
+        eval_df = prepare_df_from_json_per_object(path_to_datajson=path, needed_classes=costume_classes)
         LOGGER.info("size of DF" + str(len(eval_df)))
         LOGGER.info("DF head")
         LOGGER.info(eval_df.head())
