@@ -55,15 +55,19 @@ def prepare_df_from_json_per_object(path_to_datajson, needed_classes):
                 subdf["class_name"] == needed_classes[2]) | (subdf["class_name"] == needed_classes[3])]
     data = []
     training_subset = training_subset.copy()
-    training_subset["image_urls"] = training_subset.index
+    # training_subset["image_urls"] = training_subset.index
     for urls, label, subclass in training_subset[["image_urls", "class_type", "class_name"]].values:
         for i in range(4):
             if label == 'OK':
                 label01 = 0
+                data.append([take_filename(urls[i]), label01, subclass])
+                break
             else:
                 label01 = 1
+                data.append([take_filename(urls[i]), label01, subclass])
+                break
             # data.append([take_filename(urls[i]), label, subclass])
-            data.append([take_filename(urls[i]), label01, subclass])
+
 
     return pd.DataFrame(data, columns=["file", "label", "subclass"])
 #
