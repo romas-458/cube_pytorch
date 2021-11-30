@@ -265,7 +265,7 @@ class Trainer:
             raise KeyboardInterrupt
         stream = tqdm(self.valid_data, position=0, leave=True)
         # Iterate over batch of data.
-        for _, (inputs, labels) in enumerate(stream):
+        for _, (inputs, labels, _) in enumerate(stream):
             inputs = inputs.to(self.device, non_blocking=True)
             labels = labels.to(self.device, non_blocking=True)
             # forward
