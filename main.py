@@ -175,7 +175,7 @@ def evaluation_wandb(path_to_datajson, examples, root_dir, local_storage_dir, ep
     print('tn= ' + str(tn) + 'fp= ' + str(fp) + 'fn= ' + str(fn) + 'tp= ' + str(tp))
     wandb.log({'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp})
 
-def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model):
+def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model, width = 512, height = 512):
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     ai_default_model_path = os.path.join(ROOT_DIR, path_to_model)  # path to save model
     model_path = os.path.join(ROOT_DIR, path_to_model)
@@ -189,6 +189,8 @@ def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
         train_path=os.path.join(ROOT_DIR, local_storage_dir),
         nok_threshold=ai_nok_threshold,
         epochs = epochs,
+        width=width,
+        height=height,
     )
     # pytorch_model = ClassifierModel(
     #     save_model_path=model_path,
