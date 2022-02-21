@@ -793,6 +793,7 @@ class ClassifierModel:
 
         best_tntp = -1
         best_epoch = -1
+        best_corrected_acc = -1
         for epoch in range(1, self.epochs+1):
             LOGGER.info(f"\n{'--'*5} EPOCH: {epoch} | {self.epochs} {'--'*5}\n")
             epoch_loss, epoch_acc, epoch_f1, epoch_precision, epoch_recall = trainer.train_one_epoch()
@@ -836,13 +837,18 @@ class ClassifierModel:
 
             wandb.log({'acc_ok': tn / (tn + fp), 'acc_nok': tp / (tp + fn), 'acc': (tp + tn) / (tp + fp + tn + fn)})
 
-            tntp = tn + tp
+            # tntp = tn + tp
 
-            if best_tntp < tntp:
-                best_tntp = tntp
+            corrected_acc = (tp + tn * 5.8) / (tp + fp * 5.8 + tn * 5.8 + fn)
+
+            # if best_tntp < tntp:
+            if best_corrected_acc < corrected_acc:
+                # best_tntp = tntp
                 best_epoch = epoch
+                best_corrected_acc = corrected_acc
 
-                wandb.log({'best_acc': (tp + tn) / (tp + fp + tn + fn), 'best_epoch': best_epoch})
+                wandb.log({'tn_bc': tn, 'fp_bc': fp, 'fn_bc': fn, 'tp_bc': tp})
+                wandb.log({'best_acc': (tp + tn) / (tp + fp + tn + fn), 'best_corr_acc': best_corrected_acc, 'best_epoch': best_epoch})
 
         time_elapsed = time.time() - since
         LOGGER.info(
@@ -1127,6 +1133,7 @@ class ClassifierModel:
 
         best_tntp = -1
         best_epoch = -1
+        best_corrected_acc = -1
 
         for epoch in range(1, self.finetune_epochs+1):
             LOGGER.info(f"\n{'--'*5} EPOCH: {epoch} | {self.finetune_epochs} {'--'*5}\n")
@@ -1169,13 +1176,27 @@ class ClassifierModel:
 
             wandb.log({'acc_ok_fine': tn / (tn + fp), 'acc_nok_fine': tp / (tp + fn), 'acc_fine': (tp + tn) / (tp + fp + tn + fn)})
 
-            tntp = tn + tp
+            # tntp = tn + tp
 
-            if best_tntp < tntp:
-                best_tntp = tntp
+            corrected_acc = (tp + tn * 5.8) / (tp + fp * 5.8 + tn * 5.8 + fn)
+
+            # if best_tntp < tntp:
+            if best_corrected_acc < corrected_acc:
+                # best_tntp = tntp
                 best_epoch = epoch
+                best_corrected_acc = corrected_acc
 
-                wandb.log({'best_acc_fine': (tp + tn) / (tp + fp + tn + fn), 'best_epoch_fine': best_epoch})
+                wandb.log({'tn_bc_f': tn, 'fp_bc_f': fp, 'fn_bc_f': fn, 'tp_bc_f': tp})
+                wandb.log({'best_acc_fine': (tp + tn) / (tp + fp + tn + fn), 'best_corr_acc_fine': best_corrected_acc,
+                           'best_epoch_fine': best_epoch})
+
+            # tntp = tn + tp
+            #
+            # if best_tntp < tntp:
+            #     best_tntp = tntp
+            #     best_epoch = epoch
+            #
+            #     wandb.log({'best_acc_fine': (tp + tn) / (tp + fp + tn + fn), 'best_epoch_fine': best_epoch})
 
         time_elapsed = time.time() - since
         LOGGER.info(
