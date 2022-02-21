@@ -22,13 +22,13 @@ LOGGER.setLevel(logging.INFO)
 # examples = [okb_class, okt_class, nokb_class, nokt_class]
 
 def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, save_model_path="model.pth",
-         ft_layers=270):
+         ft_layers=270, nok_threshold = 0.5):
     LOGGER.info("Initializing components")
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     model_path = os.path.join(ROOT_DIR, save_model_path)
     ai_default_model_path = os.path.join(ROOT_DIR, "models/cube_resnext101.pth")  # path to save model
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
-    ai_nok_threshold = 0.5
+    ai_nok_threshold = nok_threshold
     local_storage_dir = local_storage_dir  # "/home/roman/Завантаження/Cube_project/Data 13.09.2021-20210921T124220Z-001/Data 13.09.2021/blob_storage"
 
     pytorch_model = ClassifierModel(
@@ -49,13 +49,13 @@ def main(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width,
 
 
 def main_check_val_loader(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height,
-                          save_model_path="model.pth", ft_layers=270):
+                          save_model_path="model.pth", ft_layers=270, nok_threshold = 0.5):
     LOGGER.info("Initializing components")
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     model_path = os.path.join(ROOT_DIR, save_model_path)
     ai_default_model_path = os.path.join(ROOT_DIR, "models/cube_resnext101.pth")  # path to save model
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
-    ai_nok_threshold = 0.5
+    ai_nok_threshold = nok_threshold
     local_storage_dir = local_storage_dir  # "/home/roman/Завантаження/Cube_project/Data 13.09.2021-20210921T124220Z-001/Data 13.09.2021/blob_storage"
 
     pytorch_model = ClassifierModel(
@@ -78,13 +78,13 @@ def main_check_val_loader(path_to_datajson, examples, root_dir, local_storage_di
 
 def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, width, height, config,
                feature_extract=True, default_base_path="models/resnext101_32x8d-8ba56ff5.pth",
-               default_model_path="models/cube_resnext101.pth"):
+               default_model_path="models/cube_resnext101.pth", nok_threshold = 0.5):
     LOGGER.info("Initializing components")
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     model_path = os.path.join(ROOT_DIR, "model.pth")
     ai_default_model_path = os.path.join(ROOT_DIR, default_model_path)  # path to save model
     ai_default_base_path = os.path.join(ROOT_DIR, default_base_path)  # imagenet weights
-    ai_nok_threshold = 0.5
+    ai_nok_threshold = nok_threshold
     local_storage_dir = local_storage_dir  # "/home/roman/Завантаження/Cube_project/Data 13.09.2021-20210921T124220Z-001/Data 13.09.2021/blob_storage"
 
     pytorch_model = ClassifierModel(
@@ -115,13 +115,13 @@ def main_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
 def main_wandb_eval_each_epoch(path_to_datajson, examples_train, examples_eval, root_dir, local_storage_dir, epochs,
                                width, height, config, path_to_model="model.pth", feature_extract=True,
                                default_base_path="models/resnext101_32x8d-8ba56ff5.pth",
-                               default_model_path="models/cube_resnext101.pth"):
+                               default_model_path="models/cube_resnext101.pth", nok_threshold = 0.5):
     LOGGER.info("Initializing components")
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     model_path = os.path.join(ROOT_DIR, path_to_model)
     ai_default_model_path = os.path.join(ROOT_DIR, default_model_path)  # path to save model
     ai_default_base_path = os.path.join(ROOT_DIR, default_base_path)  # imagenet weights
-    ai_nok_threshold = 0.5
+    ai_nok_threshold = nok_threshold
     local_storage_dir = local_storage_dir  # "/home/roman/Завантаження/Cube_project/Data 13.09.2021-20210921T124220Z-001/Data 13.09.2021/blob_storage"
 
     pytorch_model = ClassifierModel(
