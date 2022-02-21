@@ -152,12 +152,12 @@ def main_wandb_eval_each_epoch(path_to_datajson, examples_train, examples_eval, 
     pytorch_model.train_from_csv_wandb_eval_each_epoch(path_to_datajson, examples_train, monitor, terminator)
 
 
-def evaluation_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model, width=512, height=512):
+def evaluation_wandb(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model, width=512, height=512, nok_threshold = 0.5):
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     ai_default_model_path = os.path.join(ROOT_DIR, path_to_model)  # path to save model
     model_path = os.path.join(ROOT_DIR, path_to_model)
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
-    ai_nok_threshold = 0.5
+    ai_nok_threshold = nok_threshold
 
     pytorch_model = ClassifierModel(
         save_model_path=ROOT_DIR + path_to_model,
@@ -190,12 +190,12 @@ def evaluation_wandb(path_to_datajson, examples, root_dir, local_storage_dir, ep
     wandb.log({'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp})
 
 
-def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model, width=512, height=512):
+def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model, width=512, height=512, nok_threshold = 0.5):
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     ai_default_model_path = os.path.join(ROOT_DIR, path_to_model)  # path to save model
     model_path = os.path.join(ROOT_DIR, path_to_model)
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
-    ai_nok_threshold = 0.5
+    ai_nok_threshold = nok_threshold
 
     pytorch_model = ClassifierModel(
         save_model_path=ROOT_DIR + path_to_model,
@@ -227,12 +227,12 @@ def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, 
     print('tn= ' + str(tn) + 'fp= ' + str(fp) + 'fn= ' + str(fn) + 'tp= ' + str(tp))
 
 
-def evaluation_check_df(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model):
+def evaluation_check_df(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model, nok_threshold = 0.5):
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     ai_default_model_path = os.path.join(ROOT_DIR, path_to_model)  # path to save model
     model_path = os.path.join(ROOT_DIR, path_to_model)
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
-    ai_nok_threshold = 0.5
+    ai_nok_threshold = nok_threshold
 
     pytorch_model = ClassifierModel(
         save_model_path=ROOT_DIR + path_to_model,
@@ -257,12 +257,12 @@ def evaluation_check_df(path_to_datajson, examples, root_dir, local_storage_dir,
     return eval_df, preds
 
 
-def evaluation_per_object(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model):
+def evaluation_per_object(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model, nok_threshold = 0.5):
     ROOT_DIR = root_dir  # "/home/roman/Projects/PreProjects/Cube_Project/Cube/train_pytorch"
     ai_default_model_path = os.path.join(ROOT_DIR, path_to_model)  # path to save model
     model_path = os.path.join(ROOT_DIR, path_to_model)
     ai_default_base_path = os.path.join(ROOT_DIR, "models/resnext101_32x8d-8ba56ff5.pth")  # imagenet weights
-    ai_nok_threshold = 0.5
+    ai_nok_threshold = nok_threshold
 
     pytorch_model = ClassifierModel(
         save_model_path=ROOT_DIR + path_to_model,
