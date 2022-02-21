@@ -834,13 +834,15 @@ class ClassifierModel:
             print('tn= ' + str(tn) + 'fp= ' + str(fp) + 'fn= ' + str(fn) + 'tp= ' + str(tp))
             wandb.log({'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp})
 
+            wandb.log({'acc_ok': tn / (tn + fp), 'acc_nok': tp / (tp + fn), 'acc': (tp + tn) / (tp + fp + tn + fn)})
+
             tntp = tn + tp
 
             if best_tntp < tntp:
                 best_tntp = tntp
                 best_epoch = epoch
 
-                wandb.log({'best_tntp': best_tntp, 'best_epoch': best_epoch})
+                wandb.log({'best_acc': (tp + tn) / (tp + fp + tn + fn), 'best_epoch': best_epoch})
 
         time_elapsed = time.time() - since
         LOGGER.info(
