@@ -188,7 +188,7 @@ def evaluation_wandb(path_to_datajson, examples, root_dir, local_storage_dir, ep
     tn, fp, fn, tp = metrics.confusion_matrix(eval_df["label"].values, predictions).ravel()
     print('tn= ' + str(tn) + 'fp= ' + str(fp) + 'fn= ' + str(fn) + 'tp= ' + str(tp))
     wandb.log({'tn': tn, 'fp': fp, 'fn': fn, 'tp': tp})
-    wandb.log({'acc_ok': tn/( tn + fn), 'acc_nok': tp/( tp + fp), 'acc': (tp + tn) /( tp + fp + tn + fn)})
+    wandb.log({'acc_ok': tn/( tn + fp), 'acc_nok': tp/( tp + fn), 'acc': (tp + tn) /( tp + fp + tn + fn)})
 
 
 def evaluation(path_to_datajson, examples, root_dir, local_storage_dir, epochs, path_to_model, width=512, height=512, nok_threshold = 0.5):
